@@ -1,65 +1,23 @@
 from django.shortcuts import get_object_or_404, redirect
-from blog.models import Post, Category
 from django.contrib.auth import get_user_model
-from .forms import PostForm, CommentsForm, UserForm
-from .models import Comments
-from django.db.models import Count
-from django.contrib.auth.mixins import UserPassesTestMixin
 from django.views.generic import (ListView,
                                   CreateView,
                                   UpdateView,
                                   DeleteView,
                                   DetailView)
+from django.db.models import Count
 from django.urls import reverse
 from django.utils import timezone
-from django.http import Http404
+
+from .models import Post, Category
+from .forms import CommentsForm, UserForm
+from .mixins import (CommentEditMixin,
+                     PostsListMixin,
+                     OnlyAuthorMixin,
+                     PostMixin)
 
 
 User = get_user_model()
-
-
-class CommentEditMixin():
-    model = Comments
-    context_object_name = 'comment'
-    form_class = CommentsForm
-    pk_url_kwarg = 'comment'
-    pk_filed = 'id'
-    template_name = 'blog/comment.html'
-
-    def get_queryset(self):
-        post = self.kwargs['post']
-        comment = self.kwargs['comment']
-        queryset = Comments.objects.filter(post_id=post, id=comment)
-        return queryset
-
-    def get_success_url(self):
-        return reverse(
-            'blog:post_detail',
-            kwargs={'id': self.object.post_id}
-        )
-
-
-class ListMixin():
-    model = Post
-    ordering = '-pub_date'
-    paginate_by = 10
-
-
-class OnlyAuthorMixin(UserPassesTestMixin):
-
-    def test_func(self):
-        return self.get_object().author == self.request.user
-
-
-class PostMixin():
-    model = Post
-    form_class = PostForm
-    template_name = 'blog/create.html'
-
-    def get_success_url(self):
-        return reverse(
-            'blog:profile',
-            kwargs={'username': self.request.user.username})
 
 
 class PostCreateView(PostMixin, CreateView):
@@ -104,7 +62,7 @@ class PostDetailView(DetailView):
         return context
 
 
-class PostListView(ListMixin, ListView):
+class PostListView(PostsListMixin, ListView):
     template_name = 'blog/index.html'
 
     def get_queryset(self):
@@ -137,7 +95,7 @@ class CommentDeleteView(OnlyAuthorMixin, CommentEditMixin, DeleteView):
     pass
 
 
-class ProfileListView(ListMixin, ListView):
+class ProfileListView(PostsListMixin, ListView):
     slug_url_kwarg = 'username'
     slug_field = 'username'
     template_name = 'blog/profile.html'
@@ -152,7 +110,7 @@ class ProfileListView(ListMixin, ListView):
     def get_queryset(self):
         queryset = super().get_queryset().filter(
             author__username=self.kwargs['username']).annotate(
-                comment_count=Count("comments"))
+                comment_count=Count('comments'))
         if get_object_or_404(User,
                              username=self.kwargs['username']
                              ) == self.request.user:
@@ -176,16 +134,15 @@ class UserUpdateView(UpdateView):
             kwargs={'username': self.request.user.username})
 
 
-class CategoryListView(ListMixin, ListView):
+class CategoryListView(PostsListMixin, ListView):
     template_name = 'blog/category.html'
     pk_url_kwarg = 'category_slug'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         category = get_object_or_404(Category,
-                                     slug=self.kwargs['category_slug'])
-        if not category.is_published:
-            raise Http404
+                                     slug=self.kwargs['category_slug'],
+                                     is_published=True)
         context['category'] = category
         return context
 

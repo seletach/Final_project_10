@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 
+
 User = get_user_model()
 
 
@@ -82,13 +83,14 @@ class Post(BaseModel):
         ordering = ['-pub_date']
         verbose_name = 'публикация'
         verbose_name_plural = 'Публикации'
+        default_related_name = ''
 
     def __str__(self):
         return self.title
 
 
 class Comments(models.Model):
-    text = models.TextField('')
+    text = models.TextField('Post')
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
