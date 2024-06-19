@@ -8,6 +8,7 @@ from django.views.generic import (ListView,
 from django.db.models import Count
 from django.urls import reverse
 from django.utils import timezone
+from django.core.mail import send_mail
 
 from .models import Post, Category
 from .forms import CommentsForm, UserForm
@@ -71,7 +72,7 @@ class PostListView(PostsListMixin, ListView):
                                              pub_date__lte=timezone.now()
                                              ).annotate(
                                                  comment_count=Count(
-                                                     "comments"))
+                                                     'comments'))
 
 
 def add_comment(request, id):
@@ -84,6 +85,13 @@ def add_comment(request, id):
             comment.author = request.user
             comment.post = post
             comment.save()
+            send_mail(
+                subject='Новый комментарий!',
+                message=f'Новый комментарий от автора {request.user.username}',
+                from_email='post_form@acme.not',
+                recipient_list=['admin@blogicum.not'],
+                fail_silently=True,
+            )
         return redirect('blog:post_detail', id=id)
 
 
@@ -152,4 +160,4 @@ class CategoryListView(PostsListMixin, ListView):
             pub_date__lte=timezone.now(),
             is_published=True,
             category__slug=self.kwargs['category_slug']).annotate(
-                comment_count=Count("comments"))
+                comment_count=Count('comments'))
